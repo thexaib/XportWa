@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from model import Chatsession
 from model import Message
 from model import XporterAndroid
@@ -74,5 +73,8 @@ else:
     xporter=XporterIPhone()
     print "IPhone Mode"
 
+#setting up xporter
 xporter.dbfile=options.infile
 xporter.initdb()
+xporter.trydecryptdb()
+#end:setting up xporter

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess
 
 ################################################################################
@@ -208,12 +209,29 @@ class Xporter(object):
         self.dbfile=""
         self.wafile=None
 
+        self.PYTHON_VERSION = None
+        testtext = ""
+        testtext = testtext.replace('\ue40e', 'v3')
+        if testtext == "v3":
+            self.PYTHON_VERSION = 3
+            print ("Python Version 3.x")
+        else:
+            self.PYTHON_VERSION = 2
+            print ("Python Version 2.x")
+            reload(sys)
+            sys.setdefaultencoding( "utf-8" )
+            #import convert_smileys_python_2
+
+
     def initdb(self):
         self.msgstore = sqlite3.connect(self.dbfile)
         self.msgstore.row_factory = sqlite3.Row
         self.msgstorecur1 = self.msgstore.cursor()
         self.msgstorecur2 = self.msgstore.cursor()
         print "{} Connecting DB".format(self.mode)
+
+    def trydecryptdb(self):
+        pass
 #end:Class: Xporter Base Class
 
 #Class: XporterAndroid
@@ -221,13 +239,135 @@ class XporterAndroid(Xporter):
     def __init__(self):
         super(self.__class__,self).__init__(mode="Android")
 
+    def trydecryptdb(self):
+        self.repairedfile = ""
+        self.decodedfile = ""
+        try:
+            self.msgstorecur1.execute("SELECT * FROM chat_list")
+        except sqlite3.Error as msg:
+            try:
+                print ("trying to repair android database...")
+                self.msgstorecur1.close()
+                self.msgstorecur2.close()
+                self.msgstore.close()
+                self.repairedfile = self.dbfile+ "_repaired.db"
+                if os.path.exists(self.repairedfile):
+                    os.remove(self.repairedfile)
+                os.system('echo .dump | sqlite3 "%s" > Temp.sql' % self.dbfile)
+                os.system('echo .quit | sqlite3 -init Temp.sql "%s"' % self.repairedfile)
+                if os.path.exists("Temp.sql"):
+                    os.remove("Temp.sql")
+                self.msgstore = sqlite3.connect(self.repairedfile)
+                self.msgstore.row_factory = sqlite3.Row
+                self.msgstorecur1 = self.msgstore.cursor()
+                self.msgstorecur2 = self.msgstore.cursor()
+                self.msgstorecur1.execute("SELECT * FROM chat_list")
+            except sqlite3.Error as msg:
+                try:
+                    print ("trying to decrypt android database...")
+                    self.msgstorecur1.close()
+                    self.msgstorecur2.close()
+                    self.msgstore.close()
+                    if os.path.exists(self.repairedfile):
+                        os.remove(self.repairedfile)
+                    from Crypto.Cipher import AES
+                    code = "346a23652a46392b4d73257c67317e352e3372482177652c"
+                    if self.PYTHON_VERSION == 2:
+                        code = code.decode('hex')
+                    elif self.PYTHON_VERSION == 3:
+                        code = bytes.fromhex(code)
+                    cipher = AES.new(code,1)
+                    decoded = cipher.decrypt(open(self.dbfile,"rb").read())
+                    self.decodedfile = self.dbfile.replace(".db.crypt","")+".plain.db"
+                    output = open(self.decodedfile,"wb")
+                    output.write(decoded)
+                    output.close()
+                    #print ("size:" + str(len (decoded)) )
+                    self.msgstore = sqlite3.connect(self.decodedfile)
+                    self.msgstore.row_factory = sqlite3.Row
+                    self.msgstorecur1 = self.msgstore.cursor()
+                    self.msgstorecur2 = self.msgstore.cursor()
+                    print ("decrypted database written to "+self.decodedfile)
+                    self.msgstorecur1.execute("SELECT * FROM chat_list")
+                except sqlite3.Error as msg:
+                    try:
+                        if os.path.exists(self.decodedfile):
+                            print ("trying to repair decrypted android database...")
+                            self.msgstorecur1.close()
+                            self.msgstorecur2.close()
+                            self.msgstore.close()
+                            self.repairedfile = self.decodedfile + "_repaired.db"
+                            if os.path.exists(self.repairedfile):
+                                os.remove(self.repairedfile)
+                            os.system('echo .dump | sqlite3 "%s" > Temp.sql' % self.decodedfile)
+                            os.system('echo .quit | sqlite3 -init Temp.sql "%s"' % self.repairedfile)
+                            if os.path.exists("Temp.sql"):
+                                os.remove("Temp.sql")
+                            self.msgstore = sqlite3.connect(self.repairedfile)
+                            self.msgstore.row_factory = sqlite3.Row
+                            self.msgstorecur1 = self.msgstore.cursor()
+                            self.msgstorecur2 = self.msgstore.cursor()
+                            self.msgstorecur1.execute("SELECT * FROM chat_list")
+                    except sqlite3.Error as msg:
+                        print("Could not open database file. Guess it's not a valid Android or Iphone database file. ")
+                        try:
+                            self.msgstorecur1.close()
+                            self.msgstorecur2.close()
+                            self.msgstore.close()
+                            if os.path.exists(self.repairedfile):
+                                os.remove(self.repairedfile)
+                                #if os.path.exists(decodedfile):
+                                #    os.remove(decodedfile)
+                        except:
+                            print('Could not clean up.')
+                        sys.exit(1)
+                except ValueError as msg:
+                    print('Error during decrypting: {}'.format(msg))
+                    print("Could not decrypt database file. Guess it's not a valid Android/Iphone database file or Whatsapp changed the encryption.")
+                    sys.exit(1)
+
     def initdb(self):
         super(self.__class__,self).initdb()
+        self.wastore = sqlite3.connect(self.wafile)
+        self.wastore.row_factory = sqlite3.Row
+        self.wastorecur = self.wastore.cursor()
+        print "Connecting Wa file"
 #endClass: XporterAndroid
 
 #Class: XporterIPhone
 class XporterIPhone(Xporter):
     def __init__(self):
         super(self.__class__,self).__init__(mode="IPhone")
+        
+    def trydecryptdb(self):
+        try:
+            # ------------------------------------------------------ #
+            #  IPHONE  ChatStorage.sqlite file *** Z_METADATA TABLE  #
+            # ------------------------------------------------------ #
+            # Z_VERSION INTEGER PRIMARY KEY
+            # Z_UIID VARCHAR
+            # Z_PLIST BLOB
+            from bplist import BPlistReader
+            self.msgstorecur1.execute("SELECT * FROM Z_METADATA")
+            metadata = self.msgstorecur1.fetchone()
+            print ("*** METADATA PLIST DUMP ***\n")
+            print ("Plist ver.:  {}".format(metadata["Z_VERSION"]))
+            print ("UUID:        {}".format(metadata["Z_UUID"]))
+            bpReader = BPlistReader(metadata["Z_PLIST"])
+            plist = bpReader.parse()
+
+            for entry in plist.items():
+                if entry[0] == "NSStoreModelVersionHashes":
+                    print ("{}:".format(entry[0]))
+                    for inner_entry in entry[1].items():
+                        print ("\t{}: {}".format(inner_entry[0],base64.b64encode(inner_entry[1]).decode("utf-8")))
+                else:
+                    print ("{}: {}".format(entry[0],entry[1]))
+            print ("\n***************************\n")
+
+        except:
+            print ("Metadata Plist Dump is failed. Note that you need to use Python 2.7 for that bplist.py works")
+
+
 
 #Class: XporterIPhone
