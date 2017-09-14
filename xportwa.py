@@ -6,7 +6,7 @@ from model import XporterIPhone
 import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess
 from argparse import ArgumentParser
 import pprint
-
+from outlet import *
 
 #func:checkplatform
 def checkplatform(file):
@@ -77,7 +77,16 @@ else:
 xporter.dbfile=options.infile
 xporter.initdb()
 xporter.trydecryptdb()
+#end:setting up xporter
+
 
 chats=xporter.getAllChats()
-print len(chats)
-#end:setting up xporter
+
+if options.chat_id is not -1:
+    #get_msgs_for_chat
+    #print_chatsessions({options.chat_id:chat_session_list[options.chat_id]})
+    #msgs= get_msgs_for_chat(chat_session_list[options.chat_id])
+    #print_msgs(msgs)
+    pass
+else:
+    print_chats(chats)
