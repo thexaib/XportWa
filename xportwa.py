@@ -77,4 +77,7 @@ else:
 xporter.dbfile=options.infile
 xporter.initdb()
 xporter.trydecryptdb()
+
+chats=xporter.getAllChats()
+print len(chats)
 #end:setting up xporter

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess
+import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess, pprint
 
 ################################################################################
 #Class Chatsession
@@ -71,7 +71,7 @@ class Chatsession:
 
     # comparison operator
     def __cmp__(self, other):
-        if self.id == other.pk_cs:
+        if self.id == other.id:
             return 0
         return 1
 #end:Class Chatsession
@@ -189,7 +189,7 @@ class Message:
 
     # comparison operator
     def __cmp__(self, other):
-        if self.id == other.pk_msg:
+        if self.id == other.id:
             return 0
         return 1
 #end: Message Class definition
@@ -232,6 +232,10 @@ class Xporter(object):
 
     def trydecryptdb(self):
         pass
+
+    def getAllChats(self):
+        pass
+
 #end:Class: Xporter Base Class
 
 #Class: XporterAndroid
@@ -332,13 +336,110 @@ class XporterAndroid(Xporter):
         self.wastore.row_factory = sqlite3.Row
         self.wastorecur = self.wastore.cursor()
         print "Connecting Wa file"
+
+    def getAllChats(self):
+        print("Getting Chat Sessions")
+        chat_session_list = []
+        try:
+            if self.wafile is not None:
+                self.wastorecur.execute("SELECT * FROM wa_contacts WHERE is_whatsapp_user = 1 GROUP BY jid")
+                for ws in self.wastorecur:
+                    #pprint.pprint(ws.keys())
+                    break
+                for chats in self.wastorecur:
+                    # ------------------------------------------ #
+                    #  ANDROID WA.db file *** wa_contacts TABLE  #
+                    # ------------------------------------------ #
+                    # chats[0] --> id (primary key)
+                    # chats[1] --> jid
+                    # chats[2] --> is_whatsapp_user
+                    # chats[3] --> is_iphone
+                    # chats[4] --> status
+                    # chats[5] --> number
+                    # chats[6] --> raw_contact_id
+                    # chats[7] --> display_name
+                    # chats[8] --> phone_type
+                    # chats[9] --> phone_label
+                    # chats[10] -> unseen_msg_count
+                    # chats[11] -> photo_ts
+                    try:
+                        self.msgstorecur2.execute("SELECT message_table_id FROM chat_list WHERE key_remote_jid=?", [chats["jid"]])
+                        lastmessage = self.msgstorecur2.fetchone()[0]
+                        #!todo alternativ maximale _id WHERE key_remote_jid
+                        self.msgstorecur2.execute("SELECT timestamp FROM messages WHERE _id=?", [lastmessage])
+                        lastmessagedate = self.msgstorecur2.fetchone()[0]
+                    except: #not all contacts that are whatsapp users may already have been chatted with
+                        lastmessagedate = None
+
+                    total_num=self.get_msg_count_by_chatid(chats["jid"])
+                    curr_chat = Chatsession(id=chats["_id"],
+                                            contactname=chats["display_name"],
+                                            contactid=chats["jid"],
+                                            msgcount=total_num,
+                                            unreadcount=chats["unseen_msg_count"],
+                                            contactstatus=chats["status"],
+                                            lastmessagedate=lastmessagedate,
+                                            mode=self.mode)
+
+                    if total_num>0:
+                        #chat_session_list[chats["_id"]]=curr_chat
+                        chat_session_list.append(curr_chat)
+                    #end:if not wafile
+            else:
+                self.msgstorecur1.execute("SELECT * FROM chat_list")
+                for chats in self.msgstorecur1:
+                    # ---------------------------------------------- #
+                    #  ANDROID MSGSTORE.db file *** chat_list TABLE  #
+                    # ---------------------------------------------- #
+                    # chats[0] --> _id (primary key)
+                    # chats[1] --> key_remote_jid (contact jid or group chat jid)
+                    # chats[2] --> message_table_id (id of last message in this chat, corresponds to table messages primary key)
+                    name = chats["key_remote_jid"].split('@')[0]
+                    try:
+                        lastmessage = chats["message_table_id"]
+                        self.msgstorecur2.execute("SELECT timestamp FROM messages WHERE _id=?", [lastmessage])
+                        lastmessagedate = self.msgstorecur2.fetchone()[0]
+                    except:
+                        lastmessagedate = None
+
+                    total_num=self.get_msg_count_by_chatid(chats["jid"])
+                    curr_chat = Chatsession(id=chats["_id"],
+                                            contactname=name,
+                                            contactid=chats["key_remote_jid"],
+                                            msgcount=total_num,
+                                            unreadcount=None,
+                                            contactstatus=None,
+                                            lastmessagedate=lastmessagedate,
+                                            mode=self.mode)
+                    if total_num>0:
+                        chat_session_list.append(curr_chat)
+                        #chat_session_list[chats["_id"]]=curr_chat
+
+                        #end else no wafile
+
+            chat_session_list = sorted(chat_session_list, key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
+            return chat_session_list
+            #end try
+        except sqlite3.Error as msg:
+            print('Error: {}'.format(msg))
+            sys.exit(1)
+
+    def get_msg_count_by_chatid(self,chat_id):
+        cur=self.msgstore.cursor()
+        total=None
+        cur.execute("SELECT count(*) as num FROM messages WHERE key_remote_jid=? ORDER BY _id ASC;", [chat_id])
+        for ws in cur:
+            total= ws['num']
+            break
+        return total
+
 #endClass: XporterAndroid
 
 #Class: XporterIPhone
 class XporterIPhone(Xporter):
     def __init__(self):
         super(self.__class__,self).__init__(mode="IPhone")
-        
+
     def trydecryptdb(self):
         try:
             # ------------------------------------------------------ #
