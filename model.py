@@ -472,3 +472,67 @@ class XporterIPhone(Xporter):
 
 
 #Class: XporterIPhone
+
+    def getAllChats(self):
+        print("Getting Chat Sessions")
+        chat_session_list = []
+        try:
+            self.msgstorecur1.execute("SELECT * FROM ZWACHATSESSION")
+            for ws in self.msgstorecur1:
+                #pprint.pprint(ws.keys())
+                break
+            for chats in self.msgstorecur1:
+                # ---------------------------------------------------------- #
+                #  IPHONE  ChatStorage.sqlite file *** ZWACHATSESSION TABLE  #
+                # ---------------------------------------------------------- #
+                # chats[0] --> Z_PK (primary key)
+                # chats[1] --> Z_ENT
+                # chats[2] --> Z_OPT
+                # chats[3] --> ZINCLUDEUSERNAME
+                # chats[4] --> ZUNREADCOUNT
+                # chats[5] --> ZCONTACTABID
+                # chats[6] --> ZMESSAGECOUNTER
+                # chats[7] --> ZLASTMESSAGEDATE
+                # chats[8] --> ZCONTACTJID
+                # chats[9] --> ZSAVEDINPUT
+                # chats[10] -> ZPARTNERNAME
+                # chats[11] -> ZLASTMESSAGETEXT
+
+                try:
+                    self.msgstorecur2.execute("SELECT ZSTATUSTEXT FROM ZWASTATUS WHERE ZCONTACTABID =?;", [chats["ZCONTACTABID"]])
+                    statustext = self.msgstorecur2.fetchone()[0]
+                except:
+                    statustext = None
+                # ---------------------------------------------------------- #
+                #  IPHONE  ChatStorage.sqlite file *** ZWASTATUS TABLE       #
+                # ---------------------------------------------------------- #
+                # Z_PK (primary key)
+                # Z_ENT
+                # Z_OPT
+                # ZEXPIRATIONTIME
+                # ZCONTACTABID
+                # ZNOPUSH
+                # ZFAVORITE
+                # ZSTATUSDATE
+                # ZPHONENUMBER
+                # c2.fetchone()[0] --> ZSTATUSTEXT
+                # ZWHATSAPPID
+                curr_chat = Chatsession(id=chats["Z_PK"],
+                                        contactname=chats["ZPARTNERNAME"],
+                                        contactid=chats["ZCONTACTJID"],
+                                        msgcount=chats["ZMESSAGECOUNTER"],
+                                        unreadcount=chats["ZUNREADCOUNT"],
+                                        contactstatus=statustext,
+                                        lastmessagedate=chats["ZLASTMESSAGEDATE"],
+                                        mode=self.mode)
+                #chat_session_list[chats["_id"]]=curr_chat
+                chat_session_list.append(curr_chat)
+
+            chat_session_list = sorted(chat_session_list, key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
+            return chat_session_list
+
+        except sqlite3.Error as msg:
+            print('Error: {}'.format(msg))
+            sys.exit(1)
+
+        #end:getAllChats
