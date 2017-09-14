@@ -80,10 +80,12 @@ xporter.trydecryptdb()
 #end:setting up xporter
 
 
-chats=xporter.getAllChats()
+chats=xporter.get_all_chats()
 
 if options.chat_id is not -1:
     #get_msgs_for_chat
+    msgs=xporter.get_all_msgs(options.chat_id)
+    print_msgs(msgs)
     #print_chatsessions({options.chat_id:chat_session_list[options.chat_id]})
     #msgs= get_msgs_for_chat(chat_session_list[options.chat_id])
     #print_msgs(msgs)

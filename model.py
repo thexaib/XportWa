@@ -229,11 +229,14 @@ class Xporter(object):
         self.msgstorecur1 = self.msgstore.cursor()
         self.msgstorecur2 = self.msgstore.cursor()
         print "{} Connecting DB".format(self.mode)
+        self.msgs_dict={}#msgs for <chat_id>:msg_list
 
     def trydecryptdb(self):
         pass
 
-    def getAllChats(self):
+    def get_all_chats(self):
+        pass
+    def get_all_msgs(self,chat_id):
         pass
 
 #end:Class: Xporter Base Class
@@ -337,9 +340,9 @@ class XporterAndroid(Xporter):
         self.wastorecur = self.wastore.cursor()
         print "Connecting Wa file"
 
-    def getAllChats(self):
+    def get_all_chats(self):
         print("Getting Chat Sessions")
-        chat_session_list = []
+        self.chat_session_list = []
         try:
             if self.wafile is not None:
                 self.wastorecur.execute("SELECT * FROM wa_contacts WHERE is_whatsapp_user = 1 GROUP BY jid")
@@ -383,7 +386,7 @@ class XporterAndroid(Xporter):
 
                     if total_num>0:
                         #chat_session_list[chats["_id"]]=curr_chat
-                        chat_session_list.append(curr_chat)
+                        self.chat_session_list.append(curr_chat)
                     #end:if not wafile
             else:
                 self.msgstorecur1.execute("SELECT * FROM chat_list")
@@ -412,17 +415,19 @@ class XporterAndroid(Xporter):
                                             lastmessagedate=lastmessagedate,
                                             mode=self.mode)
                     if total_num>0:
-                        chat_session_list.append(curr_chat)
+                        self.chat_session_list.append(curr_chat)
                         #chat_session_list[chats["_id"]]=curr_chat
 
                         #end else no wafile
 
-            chat_session_list = sorted(chat_session_list, key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
-            return chat_session_list
+            chat_session_list = sorted(self.chat_session_list,
+                                       key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
+            return self.chat_session_list
             #end try
         except sqlite3.Error as msg:
             print('Error: {}'.format(msg))
             sys.exit(1)
+        #end:get_all_chats
 
     def get_msg_count_by_chatid(self,chat_id):
         cur=self.msgstore.cursor()
@@ -431,7 +436,117 @@ class XporterAndroid(Xporter):
         for ws in cur:
             total= ws['num']
             break
+        cur.close()
         return total
+
+    def get_all_msgs(self,chat_id):
+        chat=self.chat_session_list[chat_id]
+        msg_list=[]
+        try:
+            self.msgstorecur1.execute("SELECT * FROM messages WHERE key_remote_jid=? ORDER BY _id ASC;",
+                                      [chat.contact_id])
+            count_messages = 0
+            for msgs in self.msgstorecur1:
+                count_messages = count_messages + 1
+                try:
+                    if msgs["remote_resource"] == "" or msgs["remote_resource"] is None:
+                        contactfrom = msgs["key_remote_jid"]
+                    else:
+                        contactfrom = msgs["remote_resource"]
+
+                    if msgs["key_from_me"] == 1:
+                        contactfrom = "me"
+
+                    try:
+                        thumbnaildata = msgs["raw_data"]
+                    except:
+                        thumbnaildata = None
+
+                    try:
+                        if msgs["quoted_row_id"] == "" or msgs["quoted_row_id"] is None:
+                            parent_msg = 0
+                        else:
+                            parent_msg = msgs["quoted_row_id"]
+                    except:
+                        parent_msg = 0
+
+                    curr_message = Message(id=msgs["_id"],
+                                           fromme=msgs["key_from_me"],
+                                           msgdate=msgs["timestamp"],
+                                           text=msgs["data"],
+                                           contactfrom=contactfrom,
+                                           msgstatus=msgs["status"],
+                                           localurl=msgs["media_name"],
+                                           mediaurl=msgs["media_url"],
+                                           mediathumb=thumbnaildata,
+                                           mediathumblocalurl=None,
+                                           mediawatype=msgs["media_wa_type"],
+                                           mediasize=msgs["media_size"],
+                                           latitude=msgs["latitude"],
+                                           longitude=msgs["longitude"],
+                                           vcardname=None,
+                                           vcardstring=None,
+                                           parentmsg=parent_msg,
+                                           mode=self.mode)
+
+                    #end try inner 1
+                except sqlite3.Error as msg:
+                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    curr_message = Message(id=None,
+                                           fromme=None,
+                                           msgdate=None,
+                                           text="_Error: sqlite3.Error, see output in DOS window",
+                                           contactfrom=None,
+                                           msgstatus=None,
+                                           localurl=None,
+                                           mediaurl=None,
+                                           mediathumb=None,
+                                           mediathumblocalurl=None,
+                                           mediawatype=None,
+                                           mediasize=None,
+                                           latitude=None,
+                                           longitude=None,
+                                           vcardname=None,
+                                           vcardstring=None,
+                                           parentmsg=None,
+                                           mode=self.mode)
+                except TypeError as msg:
+                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    curr_message = Message(id=None,
+                                           fromme=None,
+                                           msgdate=None,
+                                           text="_Error: Type.Error, see output in DOS window",
+                                           contactfrom=None,
+                                           msgstatus=None,
+                                           localurl=None,
+                                           mediaurl=None,
+                                           mediathumb=None,
+                                           mediathumblocalurl=None,
+                                           mediawatype=None,
+                                           mediasize=None,
+                                           latitude=None,
+                                           longitude=None,
+                                           vcardname=None,
+                                           vcardstring=None,
+                                           parentmsg=None,
+                                           mode=self.mode)
+                msg_list.append(curr_message)
+                #end:for loop
+
+
+
+            #end:try main
+        except sqlite3.Error as msg:
+            print('Error sqlite3.Error while reading chat #{}: {}'.format(chat_id, msg))
+            sys.exit(1)
+        except TypeError as msg:
+            print('Error TypeError while reading chat #{}: {}'.format(chat_id, msg))
+            sys.exit(1)
+
+        self.msgs_dict[chat_id]=msg_list
+        return msg_list
+        #end:get_all_msgs
+
 
 #endClass: XporterAndroid
 
@@ -473,9 +588,9 @@ class XporterIPhone(Xporter):
 
 #Class: XporterIPhone
 
-    def getAllChats(self):
+    def get_all_chats(self):
         print("Getting Chat Sessions")
-        chat_session_list = []
+        self.chat_session_list = []
         try:
             self.msgstorecur1.execute("SELECT * FROM ZWACHATSESSION")
             for ws in self.msgstorecur1:
@@ -526,13 +641,46 @@ class XporterIPhone(Xporter):
                                         lastmessagedate=chats["ZLASTMESSAGEDATE"],
                                         mode=self.mode)
                 #chat_session_list[chats["_id"]]=curr_chat
-                chat_session_list.append(curr_chat)
+                self.chat_session_list.append(curr_chat)
 
-            chat_session_list = sorted(chat_session_list, key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
-            return chat_session_list
+            chat_session_list = sorted(self.chat_session_list,
+                                       key=lambda Chatsession: Chatsession.last_message_date, reverse=True)
+            return self.chat_session_list
 
         except sqlite3.Error as msg:
             print('Error: {}'.format(msg))
             sys.exit(1)
 
-        #end:getAllChats
+        #end:get_all_chats
+
+    def get_all_msgs(self,chat_id):
+        chat=self.chat_session_list[chat_id]
+        try:
+            self.msgstorecur1.execute("SELECT * FROM ZWAMESSAGE WHERE ZCHATSESSION=? ORDER BY Z_PK ASC;",
+                                 [chat.id])
+            count_messages = 0
+            for msgs in self.msgstorecur1:
+                count_messages = count_messages + 1
+                try:
+                    pass
+                    #end try inner 1
+                except sqlite3.Error as msg:
+                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    curr_message = Message(None,None,None,"_Error: sqlite3.Error, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
+                except TypeError as msg:
+                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    curr_message = Message(None,None,None,"_Error: TypeError, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
+
+                #end:for loop
+
+            #append curr_msg
+
+            #end:try main
+        except sqlite3.Error as msg:
+            print('Error sqlite3.Error while reading chat #{}: {}'.format(chat_id, msg))
+            sys.exit(1)
+        except TypeError as msg:
+            print('Error TypeError while reading chat #{}: {}'.format(chat_id, msg))
+            sys.exit(1)
+
+        #end:get_all_msgs
