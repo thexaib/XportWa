@@ -655,6 +655,7 @@ class XporterIPhone(Xporter):
 
     def get_all_msgs(self,chat_id):
         chat=self.chat_session_list[chat_id]
+        msg_list=[]
         try:
             self.msgstorecur1.execute("SELECT * FROM ZWAMESSAGE WHERE ZCHATSESSION=? ORDER BY Z_PK ASC;",
                                  [chat.id])
@@ -662,7 +663,104 @@ class XporterIPhone(Xporter):
             for msgs in self.msgstorecur1:
                 count_messages = count_messages + 1
                 try:
-                    pass
+                    if msgs["ZISFROMME"] == 1:
+                        contactfrom = "me"
+                    else:
+                        contactfrom = msgs["ZFROMJID"]
+
+                    if msgs["ZPARENTMESSAGE"] == "" or msgs["ZPARENTMESSAGE"] is None:
+                        parent_msg=0
+                    else:
+                        parent_msg = msgs["ZPARENTMESSAGE"]
+
+                    if msgs["ZMEDIAITEM"] is None:
+                        curr_message = Message(msgs["Z_PK"],msgs["ZISFROMME"],msgs["ZMESSAGEDATE"],msgs["ZTEXT"],contactfrom,msgs["ZMESSAGESTATUS"],None,None,None,None,None,None,None,None,None,None,parentmsg=parent_msg)
+                    else:
+                        try:
+                            messagetext = str(msgs["ZTEXT"])
+                        except:
+                            messagetext = ""
+                        try:
+                            self.msgstorecur2.execute("SELECT * FROM ZWAMEDIAITEM WHERE Z_PK=?;", [msgs["ZMEDIAITEM"]])
+                            media = self.msgstorecur2.fetchone()
+                            try:
+                                movieduration = media["ZMOVIEDURATION"]
+                            except:
+                                movieduration = 0
+
+                            if movieduration > 0:
+                                mediawatype = "3"
+                            else:
+                                mediawatype = msgs["ZMESSAGETYPE"]
+
+                            try:
+                                ZXMPPTHUMBPATH = media["ZXMPPTHUMBPATH"]
+                            except:
+                                ZXMPPTHUMBPATH = None
+
+                            curr_message = Message(id=msgs["Z_PK"],
+                                                   fromme=msgs["ZISFROMME"],
+                                                   msgdate=msgs["ZMESSAGEDATE"],
+                                                   text=msgs["ZTEXT"],
+                                                   contactfrom=contactfrom,
+                                                   msgstatus=msgs["ZMESSAGESTATUS"],
+                                                   localurl=media["ZMEDIALOCALPATH"],
+                                                   mediaurl=media["ZMEDIAURL"],
+                                                   mediathumb=media["ZTHUMBNAILDATA"],
+                                                   mediathumblocalurl=ZXMPPTHUMBPATH,
+                                                   mediawatype=mediawatype,
+                                                   mediasize=media["ZFILESIZE"],
+                                                   latitude=media["ZLATITUDE"],
+                                                   longitude=media["ZLONGITUDE"],
+                                                   vcardname=media["ZVCARDNAME"],
+                                                   vcardstring=media["ZVCARDSTRING"],
+                                                   parentmsg=parent_msg,
+                                                   mode=self.mode)
+                        except TypeError as msg:
+                            print('Error TypeError while reading media message #{} in chat #{}: {}'.format(
+                                count_messages, chat_id, msg) + "\nI guess this means that the media part of this message can't be found in the DB")
+
+                            curr_message = Message(id=msgs["Z_PK"],
+                                                   fromme=msgs["ZISFROMME"],
+                                                   msgdate=msgs["ZMESSAGEDATE"],
+                                                   text=messagetext + "<br>MediaMessage_Error: see output in DOS window",
+                                                   contactfrom=contactfrom,
+                                                   msgstatus=msgs["ZMESSAGESTATUS"],
+                                                   localurl=None,
+                                                   mediaurl=None,
+                                                   mediathumb=None,
+                                                   mediathumblocalurl=None,
+                                                   mediawatype=None,
+                                                   mediasize=None,
+                                                   latitude=None,
+                                                   longitude=None,
+                                                   vcardname=None,
+                                                   vcardstring=None,
+                                                   parentmsg=parent_msg,
+                                                   mode=self.mode)
+
+                        except sqlite3.Error as msg:
+                            print('Error sqlite3.Error while reading media message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                            curr_message = Message(id=msgs["Z_PK"],
+                                                   fromme=msgs["ZISFROMME"],
+                                                   msgdate=msgs["ZMESSAGEDATE"],
+                                                   text=messagetext + "<br>MediaMessage_Error: see output in DOS window",
+                                                   contactfrom=contactfrom,
+                                                   msgstatus=msgs["ZMESSAGESTATUS"],
+                                                   localurl=None,
+                                                   mediaurl=None,
+                                                   mediathumb=None,
+                                                   mediathumblocalurl=None,
+                                                   mediawatype=None,
+                                                   mediasize=None,
+                                                   latitude=None,
+                                                   longitude=None,
+                                                   vcardname=None,
+                                                   vcardstring=None,
+                                                   parentmsg=parent_msg,
+                                                   mode=self.mode)
+
+
                     #end try inner 1
                 except sqlite3.Error as msg:
                     print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
@@ -671,9 +769,8 @@ class XporterIPhone(Xporter):
                     print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
                     curr_message = Message(None,None,None,"_Error: TypeError, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
 
+                msg_list.append(curr_message)
                 #end:for loop
-
-            #append curr_msg
 
             #end:try main
         except sqlite3.Error as msg:
@@ -683,4 +780,6 @@ class XporterIPhone(Xporter):
             print('Error TypeError while reading chat #{}: {}'.format(chat_id, msg))
             sys.exit(1)
 
+        self.msgs_dict[chat_id]=msg_list
+        return msg_list
         #end:get_all_msgs
