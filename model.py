@@ -81,7 +81,16 @@ class Chatsession:
 ################################################################################
 # Message Class definition
 class Message:
-
+    CONTENT_TEXT          = 0
+    CONTENT_IMAGE         = 1
+    CONTENT_AUDIO         = 2
+    CONTENT_VIDEO         = 3
+    CONTENT_VCARD         = 4
+    CONTENT_GPS           = 5
+    CONTENT_NEWGROUPNAME  = 6
+    CONTENT_MEDIA_THUMB   = 7
+    CONTENT_MEDIA_NOTHUMB = 8
+    CONTENT_OTHER         = 99
     # init
     def __init__(self, id=None, fromme=None, msgdate=None, text=None, contactfrom=None, msgstatus=None,
                  localurl=None, mediaurl=None, mediathumb=None, mediathumblocalurl=None, mediawatype=None, mediasize=None, latitude=None, longitude=None, vcardname=None, vcardstring=None, parentmsg=None,mode="Android"):
@@ -185,6 +194,94 @@ class Message:
             self.parent_msg="0"
         else:
             self.parent_msg=parentmsg
+
+        if mode=="" or mode is None:
+            self.mode="No"
+        else:
+            self.mode=mode
+
+    #get_type , android and iphone
+    def process_content_type_android(self):
+        content_type=None
+        if self.from_me == 1:
+            if self.status == 6:
+                content_type = Message.CONTENT_NEWGROUPNAME
+
+        if content_type is None:
+            if self.media_wa_type == "4":
+                content_type = Message.CONTENT_VCARD
+                self.vcard_string = self.msg_text
+                self.vcard_name = self.local_url
+            elif self.media_wa_type == "1" or self.media_wa_type == "3" or self.media_wa_type == "5":
+                if str(self.msg_text)[:3] == "/9j":
+                    self.media_thumb = "data:image/jpg;base64,\n" + self.msg_text
+                else:
+                    try:
+                        self.media_thumb = "data:image/jpg;base64,\n" + base64.b64encode(self.media_thumb).decode("utf-8")
+                    except:
+                        self.media_thumb = ""
+
+                if self.media_wa_type == "5":
+                    content_type = Message.CONTENT_GPS
+                    if self.local_url:
+                        gpsname = self.local_url
+                    else:
+                        gpsname = None
+                else:
+                    if self.media_wa_type == "3":
+                        content_type = Message.CONTENT_VIDEO
+                    else:
+                        content_type = Message.CONTENT_IMAGE
+            else:
+                if self.media_wa_type == "2":
+                    content_type = Message.CONTENT_AUDIO
+                else:
+                    content_type = Message.CONTENT_TEXT
+        self.msg_type=content_type
+
+    def process_content_type_iphone(self):
+        content_type=None
+
+        if self.media_thumb:
+            self.media_thumb = "data:image/jpg;base64,\n" + base64.b64encode(self.media_thumb).decode("utf-8")
+        elif self.media_thumb_local_url:
+            self.media_thumb = self.media_thumb_local_url
+
+        # GPS
+        if self.latitude and self.longitude:
+            content_type = Message.CONTENT_GPS
+            self.media_wa_type = "5"
+            gpsname = None
+        # VCARD
+        elif self.vcard_string:
+            content_type = Message.CONTENT_VCARD
+            self.media_wa_type = "4"
+        # AUDIO?
+        # MEDIA
+        elif self.media_url:
+            if self.media_thumb:
+                if self.media_wa_type == "3":
+                    content_type = Message.CONTENT_VIDEO
+                else:
+                    content_type = self.CONTENT_IMAGE
+                    self.media_wa_type = "1"
+                    #content_type = CONTENT_MEDIA_THUMB
+            else:
+                content_type = Message.CONTENT_MEDIA_NOTHUMB
+                # TEXT
+        elif self.msg_text is not None:
+            content_type = Message.CONTENT_TEXT
+            self.media_wa_type = "0"
+            # End if Clause
+        self.msg_type=content_type
+
+    def process_content_type(self):
+        if self.mode=="Android":
+            self.process_content_type_android()
+        else:
+            self.process_content_type_iphone()
+
+        #end:process_content_type , android and iphone
 
 
     # comparison operator
@@ -530,6 +627,7 @@ class XporterAndroid(Xporter):
                                            vcardstring=None,
                                            parentmsg=None,
                                            mode=self.mode)
+                curr_message.process_content_type()
                 msg_list.append(curr_message)
                 #end:for loop
 
@@ -769,6 +867,7 @@ class XporterIPhone(Xporter):
                     print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
                     curr_message = Message(None,None,None,"_Error: TypeError, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
 
+                curr_message.process_content_type()
                 msg_list.append(curr_message)
                 #end:for loop
 

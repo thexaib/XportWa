@@ -1,12 +1,18 @@
-from model import Chatsession
-from model import Message
 from model import XporterAndroid
 from model import XporterIPhone
 
-import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess
+import sys, os, sqlite3
 from argparse import ArgumentParser
-import pprint
 from outlet import *
+import os
+import sqlite3
+import sys
+from argparse import ArgumentParser
+
+from model import XporterAndroid
+from model import XporterIPhone
+from outlet import *
+
 
 #func:checkplatform
 def checkplatform(file):
@@ -86,9 +92,7 @@ if options.chat_id is not -1:
     #get_msgs_for_chat
     msgs=xporter.get_all_msgs(options.chat_id)
     print_msgs(msgs)
-    #print_chatsessions({options.chat_id:chat_session_list[options.chat_id]})
-    #msgs= get_msgs_for_chat(chat_session_list[options.chat_id])
-    #print_msgs(msgs)
+    #report_html(chats[options.chat_id],msgs)
     pass
 else:
     print_chats(chats)
