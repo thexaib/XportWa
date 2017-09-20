@@ -12,7 +12,9 @@ from argparse import ArgumentParser
 from model import XporterAndroid
 from model import XporterIPhone
 from outlet import *
+from htmlout import *
 
+#pathlib2
 
 #func:checkplatform
 def checkplatform(file):
@@ -48,6 +50,7 @@ parser.add_argument('-i', '--id', type=int, dest='chat_id',
 
 options = parser.parse_args()
 
+
 # checks for the wadb file
 if options.wafile is None:
     have_wa = False
@@ -65,6 +68,14 @@ if not os.path.exists(options.infile):
     print('"{}" file is not found!'.format(options.infile))
     sys.exit(1)
 
+#folder name if any of infile
+infolder=""
+if len(options.infile.split(os.sep)) >1:
+    infolder_list=options.infile.split(os.sep)[:-1]
+    infolder=os.sep.join(infolder_list)
+    if not os.path.exists(infolder):
+        print "{} folder not found".format(infolder)
+        sys.exit(1)
 #end:parsing thing
 
 
@@ -91,8 +102,17 @@ chats=xporter.get_all_chats()
 if options.chat_id is not -1:
     #get_msgs_for_chat
     msgs=xporter.get_all_msgs(options.chat_id)
-    print_msgs(msgs)
-    #report_html(chats[options.chat_id],msgs)
-    pass
+    #print_msgs(msgs)
+    report_html(chats[options.chat_id],msgs,infolder=infolder)
+    jpgfiles = [os.path.join(root,name)
+                 for root, dirs, files in os.walk(infolder)
+                 for name in files
+                 if name.endswith((".jpg", ".jpeg"))]
+    audioFiles= [os.path.join(root,name)
+                 for root, dirs, files in os.walk(infolder)
+                 for name in files
+                 if name.endswith((".acc", ".mp3",'opus'))]
+
+
 else:
     print_chats(chats)

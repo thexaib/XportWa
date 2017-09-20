@@ -1,0 +1,76 @@
+body
+{
+    background-color: #dfd5cb;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 18px;
+}
+.container
+{
+    width: 98%;
+    display: block;
+    position: relative;
+}
+.message
+{
+    display: block;
+    max-width: 77%;
+    background-color: #FCFBF6;
+    margin-bottom: 1em;
+    padding: 5px;
+    border-radius: 10px;
+    border: 1px solid #727272;
+    float: left;
+    clear: both;
+}
+.sent-msg
+{
+    float: right;
+    background-color: #d5f9ba;
+    clear: both;
+}
+.owner
+{
+    font-size: 0.8em;
+    float: left;
+    margin-left: 0.4em;
+    margin-right: 0.4em;
+}
+.sent-msg .owner
+{
+    float: right;
+}
+
+.content_date
+{
+    font-size: 0.8em;
+    color:#727272;
+    vertical-align: bottom;
+    margin-left: 0.4em;
+    margin-right: 0.4em;
+}
+.sent-msg .content_date
+{
+    float: right;
+}
+.content
+{
+    margin: 2px;
+    width: 100%;
+    float: left;
+    text-align: left;
+}
+.sent-msg .content
+{
+    float: right;
+    text-align: right;
+}
+.content .attachment
+{
+    max-height: 30vh;
+
+}
+.content .vid-attachment
+{
+    max-height: 240px;
+    max-width: 320px;
+}

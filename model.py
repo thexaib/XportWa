@@ -66,6 +66,7 @@ class Chatsession:
                 print('Error while reading chat #{}: {}'.format(self.id, msg))
                 self.last_message_date = " N/A error"
 
+        self.mode=mode
         # chat session messages
         self.msg_list = []
 
@@ -90,10 +91,11 @@ class Message:
     CONTENT_NEWGROUPNAME  = 6
     CONTENT_MEDIA_THUMB   = 7
     CONTENT_MEDIA_NOTHUMB = 8
+    CONTENT_GIF_VIDEO       = 13
     CONTENT_OTHER         = 99
     # init
     def __init__(self, id=None, fromme=None, msgdate=None, text=None, contactfrom=None, msgstatus=None,
-                 localurl=None, mediaurl=None, mediathumb=None, mediathumblocalurl=None, mediawatype=None, mediasize=None, latitude=None, longitude=None, vcardname=None, vcardstring=None, parentmsg=None,mode="Android"):
+                 localurl=None, mediaurl=None, mediathumb=None, mediathumblocalurl=None, mediawatype=None, mediasize=None, latitude=None, longitude=None, vcardname=None, vcardstring=None, parentmsg=None,mode=""):
 
         # if invalid params are passed, sets attributes to invalid values
         # primary key
@@ -212,7 +214,7 @@ class Message:
                 content_type = Message.CONTENT_VCARD
                 self.vcard_string = self.msg_text
                 self.vcard_name = self.local_url
-            elif self.media_wa_type == "1" or self.media_wa_type == "3" or self.media_wa_type == "5":
+            elif self.media_wa_type == "1" or self.media_wa_type == "3" or self.media_wa_type == "5" or self.media_wa_type == "13":
                 if str(self.msg_text)[:3] == "/9j":
                     self.media_thumb = "data:image/jpg;base64,\n" + self.msg_text
                 else:
@@ -224,12 +226,14 @@ class Message:
                 if self.media_wa_type == "5":
                     content_type = Message.CONTENT_GPS
                     if self.local_url:
-                        gpsname = self.local_url
+                        self.gpsname = self.local_url
                     else:
-                        gpsname = None
+                        self.gpsname = None
                 else:
                     if self.media_wa_type == "3":
                         content_type = Message.CONTENT_VIDEO
+                    elif self.media_wa_type=="13":
+                        content_type=Message.CONTENT_GIF_VIDEO
                     else:
                         content_type = Message.CONTENT_IMAGE
             else:
@@ -251,7 +255,7 @@ class Message:
         if self.latitude and self.longitude:
             content_type = Message.CONTENT_GPS
             self.media_wa_type = "5"
-            gpsname = None
+            self.gpsname = None
         # VCARD
         elif self.vcard_string:
             content_type = Message.CONTENT_VCARD
@@ -529,7 +533,7 @@ class XporterAndroid(Xporter):
     def get_msg_count_by_chatid(self,chat_id):
         cur=self.msgstore.cursor()
         total=None
-        cur.execute("SELECT count(*) as num FROM messages WHERE key_remote_jid=? ORDER BY _id ASC;", [chat_id])
+        cur.execute("SELECT count(*) as num FROM messages WHERE key_remote_jid=? AND status!=6 ORDER BY _id ASC;", [chat_id])
         for ws in cur:
             total= ws['num']
             break
@@ -544,6 +548,7 @@ class XporterAndroid(Xporter):
                                       [chat.contact_id])
             count_messages = 0
             for msgs in self.msgstorecur1:
+
                 count_messages = count_messages + 1
                 try:
                     if msgs["remote_resource"] == "" or msgs["remote_resource"] is None:
@@ -627,8 +632,9 @@ class XporterAndroid(Xporter):
                                            vcardstring=None,
                                            parentmsg=None,
                                            mode=self.mode)
-                curr_message.process_content_type()
-                msg_list.append(curr_message)
+                if not curr_message.status==6:
+                    curr_message.process_content_type()
+                    msg_list.append(curr_message)
                 #end:for loop
 
 
@@ -772,7 +778,7 @@ class XporterIPhone(Xporter):
                         parent_msg = msgs["ZPARENTMESSAGE"]
 
                     if msgs["ZMEDIAITEM"] is None:
-                        curr_message = Message(msgs["Z_PK"],msgs["ZISFROMME"],msgs["ZMESSAGEDATE"],msgs["ZTEXT"],contactfrom,msgs["ZMESSAGESTATUS"],None,None,None,None,None,None,None,None,None,None,parentmsg=parent_msg)
+                        curr_message = Message(msgs["Z_PK"],msgs["ZISFROMME"],msgs["ZMESSAGEDATE"],msgs["ZTEXT"],contactfrom,msgs["ZMESSAGESTATUS"],None,None,None,None,None,None,None,None,None,None,parentmsg=parent_msg,mode=self.mode)
                     else:
                         try:
                             messagetext = str(msgs["ZTEXT"])
@@ -861,10 +867,10 @@ class XporterIPhone(Xporter):
 
                     #end try inner 1
                 except sqlite3.Error as msg:
-                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    print('sqlite3.Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
                     curr_message = Message(None,None,None,"_Error: sqlite3.Error, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
                 except TypeError as msg:
-                    print('Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
+                    print('TypeError.Error while reading message #{} in chat #{}: {}'.format(count_messages, chat_id, msg))
                     curr_message = Message(None,None,None,"_Error: TypeError, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
 
                 curr_message.process_content_type()
