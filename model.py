@@ -942,7 +942,8 @@ class XporterIPhone(Xporter):
                     curr_message = Message(None,None,None,"_Error: TypeError, see output in DOS window",None,None,None,None,None,None,None,None,None,None,None,None)
 
                 curr_message.process_content_type()
-                msg_list.append(curr_message)
+                if not (curr_message.msg_type==Message.CONTENT_TEXT and curr_message.msg_text=='N/A'):
+                    msg_list.append(curr_message)
                 #end:for loop
 
             #end:try main

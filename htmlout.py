@@ -71,19 +71,31 @@ def report_html(cs=None,msgs=None,infolder=None):
             sys.exit(1)
         get_all_media_files(folder,('.jpg','jpeg','.png','.tiff','mp3','.aac','.opus','.mp4','.mov'))
 
+
+    firstdate= str(msgs[0].msg_date).replace('-','')
+    firstdate=firstdate.replace(' ','-')
+    firstdate=firstdate.replace(':','')
+    firstdate=firstdate[:-2]
+
     lastdate= str(msgs[len(msgs)-1].msg_date).replace('-','')
     lastdate=lastdate.replace(' ','-')
     lastdate=lastdate.replace(':','')
     lastdate=lastdate[:-2]
 
-    chats=""
-    outfile=open("out.html","w")
+    fname=lastdate+"_"+cs.contact_name+".html"
+    fname="out.html"
+    outfile=open(fname,"w")
     outfile.write('<!DOCTYPE html><html lang="en">')
     outfile.write('<head><link rel="stylesheet" href="out.css"></head>')
     outfile.write('<body>')
     #printing chat title
-    #outfile.writable('<div class="chat-title">')
-    #ctitle=
+    outfile.write('<div class="chat-title">')
+    outfile.write("<h2>{name}</h2><p>{num}</p><p><i>From</i> <b>{date1}</b> <i>to</i> <b>{date2}</b></p>".format(
+        name=cs.contact_name,
+        num=cs.contact_id,
+        date1=msgs[0].msg_date,
+        date2=msgs[len(msgs)-1].msg_date) )
+    outfile.write("</div>")
     #end:printing chat title
 
     outfile.write('<div class="container">')
