@@ -834,6 +834,8 @@ class XporterIPhone(Xporter):
                     else:
                         if chat.is_group and msgs['ZGROUPMEMBER'] is not None:
                             contactfrom=chat.chat_contacts[msgs['ZGROUPMEMBER']]
+                        elif not chat.is_group:
+                            contactfrom = chat.contact_name
                         else:
                             contactfrom = msgs["ZFROMJID"]
 

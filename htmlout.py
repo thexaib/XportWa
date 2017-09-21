@@ -81,6 +81,11 @@ def report_html(cs=None,msgs=None,infolder=None):
     outfile.write('<!DOCTYPE html><html lang="en">')
     outfile.write('<head><link rel="stylesheet" href="out.css"></head>')
     outfile.write('<body>')
+    #printing chat title
+    #outfile.writable('<div class="chat-title">')
+    #ctitle=
+    #end:printing chat title
+
     outfile.write('<div class="container">')
 
     for idx,msg in enumerate(msgs):
