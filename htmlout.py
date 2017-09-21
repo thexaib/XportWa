@@ -92,9 +92,9 @@ def report_html(cs=None,msgs=None,infolder=None):
             frm=msg.contact_from.split('@')[0]
 
         #temp filtering by msg type
-        if  msg.msg_type!=0:
+        #if  msg.msg_type!=0:
         #if  msg.parent_msg!=0:
-            outfile.write(get_html_for_msg(frm,msg,infolder=infolder))
+        outfile.write(get_html_for_msg(frm,msg,infolder=infolder))
 
     outfile.write('</div">')
     outfile.write('</body></html>')

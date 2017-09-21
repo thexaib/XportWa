@@ -7,7 +7,7 @@ class Chatsession:
 
     # init
     def __init__(self, id=None, contactname=None, contactid=None,
-                 msgcount=None, unreadcount=None, contactstatus=None, lastmessagedate=None,mode="Android"):
+                 msgcount=None, unreadcount=None, contactstatus=None, lastmessagedate=None,mode="Android",isgroup=False):
 
         # if invalid params are passed, sets attributes to invalid values
         # primary key
@@ -67,6 +67,8 @@ class Chatsession:
                 self.last_message_date = " N/A error"
 
         self.mode=mode
+        self.is_group=isgroup
+        self.chat_contacts={}#<<key>contact_id:<value>display_name>
         # chat session messages
         self.msg_list = []
 
@@ -436,10 +438,11 @@ class XporterAndroid(Xporter):
 
     def initdb(self):
         super(self.__class__,self).initdb()
-        self.wastore = sqlite3.connect(self.wafile)
-        self.wastore.row_factory = sqlite3.Row
-        self.wastorecur = self.wastore.cursor()
-        print "Connecting Wa file"
+        if self.wafile is not None:
+            self.wastore = sqlite3.connect(self.wafile)
+            self.wastore.row_factory = sqlite3.Row
+            self.wastorecur = self.wastore.cursor()
+            print "Connecting Wa file"
 
     def get_all_chats(self):
         print("Getting Chat Sessions")
@@ -476,6 +479,10 @@ class XporterAndroid(Xporter):
                         lastmessagedate = None
 
                     total_num=self.get_msg_count_by_chatid(chats["jid"])
+                    isgroup=False
+                    if chats['jid'].endswith(('@g.us')):
+                        isgroup=True
+
                     curr_chat = Chatsession(id=chats["_id"],
                                             contactname=chats["display_name"],
                                             contactid=chats["jid"],
@@ -483,13 +490,42 @@ class XporterAndroid(Xporter):
                                             unreadcount=chats["unseen_msg_count"],
                                             contactstatus=chats["status"],
                                             lastmessagedate=lastmessagedate,
-                                            mode=self.mode)
+                                            mode=self.mode,
+                                            isgroup=isgroup)
+                    if isgroup:
+                        cur2=self.msgstore.cursor()
+                        cur2.execute("select distinct remote_resource from messages where key_from_me !=1 and key_remote_jid=?",[chats['jid']])
+                        clist=[]
+                        for c in cur2:
+                            #curr_chat.chat_contacts[c['remote_resource']]=''
+                            clist.append(c['remote_resource'])
+                        cur2.close()
+                        if len(clist)>0:
+                            curw2=self.wastore.cursor()
+                            sqlc="SELECT * from wa_contacts WHERE jid IN ({seq})".format(
+                                seq=','.join(['?']*len(clist))
+                            )
+                            curw2.execute(sqlc,clist)
+
+                            for contact in curw2:
+                                if contact['display_name'] is not None or contact['display_name'] !="":
+                                    mm=contact['display_name']
+                                elif contact['wa_name'] is not None or contact['wa_name'] != "":
+                                    mm=contact['wa_name']
+
+                                if mm is None:
+                                    mm=contact['jid'].split('@')[0]
+
+                                curr_chat.chat_contacts[contact['jid']]=mm
+                            curw2.close()
+                        #end:if isgroup
 
                     if total_num>0:
                         #chat_session_list[chats["_id"]]=curr_chat
                         self.chat_session_list.append(curr_chat)
                     #end:if not wafile
             else:
+                #else when no wafile present
                 self.msgstorecur1.execute("SELECT * FROM chat_list")
                 for chats in self.msgstorecur1:
                     # ---------------------------------------------- #
@@ -499,6 +535,10 @@ class XporterAndroid(Xporter):
                     # chats[1] --> key_remote_jid (contact jid or group chat jid)
                     # chats[2] --> message_table_id (id of last message in this chat, corresponds to table messages primary key)
                     name = chats["key_remote_jid"].split('@')[0]
+                    isgroup=False
+                    if chats["key_remote_jid"].endswith(('@g.us')):
+                        isgroup=True
+
                     try:
                         lastmessage = chats["message_table_id"]
                         self.msgstorecur2.execute("SELECT timestamp FROM messages WHERE _id=?", [lastmessage])
@@ -506,7 +546,7 @@ class XporterAndroid(Xporter):
                     except:
                         lastmessagedate = None
 
-                    total_num=self.get_msg_count_by_chatid(chats["jid"])
+                    total_num=self.get_msg_count_by_chatid(chats["key_remote_jid"])
                     curr_chat = Chatsession(id=chats["_id"],
                                             contactname=name,
                                             contactid=chats["key_remote_jid"],
@@ -514,7 +554,8 @@ class XporterAndroid(Xporter):
                                             unreadcount=None,
                                             contactstatus=None,
                                             lastmessagedate=lastmessagedate,
-                                            mode=self.mode)
+                                            mode=self.mode,
+                                            isgroup=isgroup)
                     if total_num>0:
                         self.chat_session_list.append(curr_chat)
                         #chat_session_list[chats["_id"]]=curr_chat
@@ -551,10 +592,18 @@ class XporterAndroid(Xporter):
 
                 count_messages = count_messages + 1
                 try:
-                    if msgs["remote_resource"] == "" or msgs["remote_resource"] is None:
-                        contactfrom = msgs["key_remote_jid"]
+
+                    if chat.is_group:
+                        if len(chat.chat_contacts)>0:
+                            try:
+                                cfrom=chat.chat_contacts[msgs["remote_resource"]]
+                                contactfrom=cfrom
+                            except:
+                                if msgs["remote_resource"] == "" or msgs["remote_resource"] is None:
+                                    contactfrom = msgs["key_remote_jid"]
                     else:
-                        contactfrom = msgs["remote_resource"]
+                        contactfrom = chat.contact_name
+
 
                     if msgs["key_from_me"] == 1:
                         contactfrom = "me"
@@ -745,6 +794,19 @@ class XporterIPhone(Xporter):
                                         lastmessagedate=chats["ZLASTMESSAGEDATE"],
                                         mode=self.mode)
                 #chat_session_list[chats["_id"]]=curr_chat
+
+                #checking if is_group
+                if (chats['ZGROUPINFO'] is not None and chats['ZGROUPINFO']!=""):
+                    # or (chats['ZCONTACTJID'] is not None and chats['ZCONTACTJID'].endswith('@g.us'))
+                    curr_chat.is_group=True
+                    group_id=chats['ZGROUPINFO']
+                    gcur=self.msgstore.cursor()
+                    gcur.execute("select * from ZWAGROUPMEMBER where ZCHATSESSION=(Select ZCHATSESSION from ZWAGROUPINFO where Z_PK=?  )",[group_id])
+                    for cc in gcur:
+                        curr_chat.chat_contacts[cc['Z_PK']]=cc['ZCONTACTNAME']
+                    gcur.close()
+                    #end:checking if is_group
+
                 self.chat_session_list.append(curr_chat)
 
             chat_session_list = sorted(self.chat_session_list,
@@ -770,7 +832,11 @@ class XporterIPhone(Xporter):
                     if msgs["ZISFROMME"] == 1:
                         contactfrom = "me"
                     else:
-                        contactfrom = msgs["ZFROMJID"]
+                        if chat.is_group and msgs['ZGROUPMEMBER'] is not None:
+                            contactfrom=chat.chat_contacts[msgs['ZGROUPMEMBER']]
+                        else:
+                            contactfrom = msgs["ZFROMJID"]
+
 
                     if msgs["ZPARENTMESSAGE"] == "" or msgs["ZPARENTMESSAGE"] is None:
                         parent_msg=0
