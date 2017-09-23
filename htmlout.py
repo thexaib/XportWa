@@ -85,7 +85,7 @@ def replace_smileys (text):
 #end:replace_smileys
 
 
-def report_html(cs=None,msgs=None,infolder=None):
+def report_html(cs=None,msgs=None,infolder=None,outfile=None):
     global _allfiles_sizes,_allfiles_names
     if len(_allfiles_names)==0:
         if cs.mode=='Android':
@@ -109,10 +109,18 @@ def report_html(cs=None,msgs=None,infolder=None):
     lastdate=lastdate[:-2]
 
     fname=lastdate+"_"+cs.contact_name+".html"
-    fname="out.html"
+    if outfile is not None:
+        fname=outfile
+    else:
+        fname=lastdate+"_"+cs.contact_name+".html"
+
     outfile=open(fname,"w")
     outfile.write('<!DOCTYPE html><html lang="en">')
-    outfile.write('<head><meta charset="utf-8"><link rel="stylesheet" href="out.css"></head>')
+    outfile.write('<head>')
+    outfile.write('<meta charset="utf-8"><link rel="stylesheet" href="out.css">')
+    outfile.write("""<link rel="stylesheet" href="data/lightbox/lightbox_styles.css" type="text/css">
+                  <script type="text/javascript" src="data/lightbox/lightbox.js"></script>""")
+    outfile.write('</head>')
     outfile.write('<body>')
     #printing chat title
     outfile.write('<div class="chat-title">')
@@ -124,9 +132,30 @@ def report_html(cs=None,msgs=None,infolder=None):
     outfile.write("</div>")
     #end:printing chat title
 
+    #printing links for days
+    outfile.write('<div id="day-toc">')
+    cur_day=msgs[0].msg_date.split(" ")[0]
+    outfile.write('<p class="day-link">Goto Date</p>')
+    outfile.write('<a class="day-link" href="#{}">{}</a>'.format(cur_day,cur_day))
+    for idx,msg in enumerate(msgs):
+        this_day=msg.msg_date.split(" ")[0]
+        if this_day!=cur_day:
+            cur_day=this_day
+            outfile.write('<a class="day-link" href="#{}">{}</a>'.format(cur_day,cur_day))
+
+    outfile.write('</div>')
+
+    #end:printing links for days
+
     outfile.write('<div class="container">')
 
+    cur_day=msgs[0].msg_date.split(" ")[0]
+    outfile.write('<div class="day-marker" id="{}">{}</div>'.format(cur_day,cur_day))
     for idx,msg in enumerate(msgs):
+        this_day=msg.msg_date.split(" ")[0]
+        if this_day!=cur_day:
+            cur_day=this_day
+            outfile.write('<div class="day-marker" id="{}">{}</div>'.format(cur_day,cur_day))
 
         if msg.from_me:
             frm="ME"
@@ -160,7 +189,8 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
         #msg.media_url, msg.media_thumb,
-        content+='<img src="{}" alt="Image" class="attachment"/><!-- {} -->'.format( linkfile,msg.media_thumb).encode('utf-8')
+        content+='<img src="{_src}" alt="Image" class="attachment lightbox-photo"/><!-- {_thumb} -->'.format( _src=linkfile,
+                                 _thumb=msg.media_thumb).encode('utf-8')
 
     elif msg.msg_type == Message.CONTENT_AUDIO:
 
@@ -205,7 +235,7 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
             linkfile="#"
         else:
             if linkfile.endswith(('.jpg','.jpeg','.tiff','.png')):
-                tag='<img src="{}" alt="Image" class="attachment"/>'
+                tag='<img src="{}" alt="Image" class="attachment lightbox-photo"/>'
             elif linkfile.endswith(('.mp3','.aac','.opus')):
                 tag='<audio controls><source src="{}" type="audio/ogg">Your browser does not support the audio element.</audio>'
             elif linkfile.endswith(('.mp4','.mov')):
@@ -261,7 +291,8 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
             div_id=msg.parent_msg,
             content=qcontent
         ).encode('utf-8')
-
+    msgtime=msg.msg_date.split(' ')
+    msgtime_print="/".join(msgtime[0].split('-'))+' '+msgtime[1]
     msg_templ="""
         <div class="message {_is_me}" id="{_id}">
             <div class="owner">{_frm}</div>
@@ -276,7 +307,7 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
     if msg.from_me:
         is_sent=" sent-msg"
 
-    return msg_templ.format(_is_me=is_sent,_id=msg.id,_frm=frm,_d=msg.msg_date,_content=content)
+    return msg_templ.format(_is_me=is_sent,_id=msg.id,_frm=frm,_d=msgtime_print,_content=content)
 
     #end:get_html_for_msg
 

@@ -45,8 +45,8 @@ parser.add_argument('-w', '--wafile', dest='wafile',
                     help="optionally input 'wa.db' (Android) file to scan")
 parser.add_argument('-o', '--outfile',  dest='outfile',
                     help="optionally choose name of output file")
-parser.add_argument('-i', '--id', type=int, dest='chat_id',
-                    help="for single chat id ",default=-1)
+parser.add_argument('-d', '--id', dest='chat_id',
+                    help="Comma separated list of chat ids ",default="")
 
 
 options = parser.parse_args()
@@ -100,20 +100,22 @@ xporter.trydecryptdb()
 
 chats=xporter.get_all_chats()
 
-if options.chat_id is not -1:
-    #get_msgs_for_chat
-    msgs=xporter.get_all_msgs(options.chat_id)
-    #print_msgs(msgs)
-    report_html(chats[options.chat_id],msgs,infolder=infolder)
-    jpgfiles = [os.path.join(root,name)
-                 for root, dirs, files in os.walk(infolder)
-                 for name in files
-                 if name.endswith((".jpg", ".jpeg"))]
-    audioFiles= [os.path.join(root,name)
-                 for root, dirs, files in os.walk(infolder)
-                 for name in files
-                 if name.endswith((".acc", ".mp3",'opus'))]
+list_ids=[]
+if options.chat_id!='':
+    list_ids=str(options.chat_id).split(',')
 
+if len(list_ids)>0:
+    for id in list_ids:
+        #get_msgs_for_chat
+        msgs=xporter.get_all_msgs(int(id))
+        #print_msgs(msgs)
+        outfilename=None
+        if options.outfile is not None:
+            if len(list_ids)==1:
+                outfilename=options.outfile+".html"
+            else:
+                outfilename=options.outfile+"_"+id+".html"
+        report_html(chats[int(id)],msgs,infolder=infolder,outfile=outfilename)
 
 else:
     print_chats(chats)
