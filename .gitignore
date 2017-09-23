@@ -6,6 +6,7 @@ __pycache__/
 norepo/*
 *.iml
 .idea/*
+*.html
 
 # C extensions
 *.so
