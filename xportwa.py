@@ -36,6 +36,7 @@ def checkplatform(file):
 #end:func:checkplatform
 
 
+
 # parser options
 parser = ArgumentParser(description='Exports a Whatsapp Chat from database to HTML.')
 parser.add_argument(dest='infile',

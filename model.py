@@ -121,12 +121,13 @@ class Message:
                     msgdate = str(msgdate)
                     if msgdate.find(".") > -1: #if timestamp is not like "304966548", but like "306350664.792749", then just use the numbers in front of the "."
                         msgdate = msgdate[:msgdate.find(".")]
-                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)+11323*60*1440)
+                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)+11323*60*1440).strftime("%Y-%m-%d %I:%M%p")
                 elif mode == "Android":
                     msgdate = str(msgdate)
                     # cut last 3 digits (microseconds)
                     msgdate = msgdate[:-3]
-                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate))
+                    #self.msg_date = datetime.datetime.fromtimestamp(int(msgdate))
+                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)).strftime("%Y-%m-%d %I:%M%p")
             except (TypeError, ValueError) as msg:
                 print('Error while reading message #{}: {}'.format(self.id, msg))
                 self.msg_date = "N/A error"
@@ -341,6 +342,16 @@ class Xporter(object):
         pass
     def get_all_msgs(self,chat_id):
         pass
+    def get_parent_msgs_for_chat(self,chat_id):
+        pass
+    def find_msgindex_by_id(self,parent_id,msgs):
+        for idx,msg in enumerate(msgs):
+            if msg.id==parent_id:
+                return idx
+                break
+        else:
+            return None
+
 
 #end:Class: Xporter Base Class
 
@@ -614,10 +625,11 @@ class XporterAndroid(Xporter):
                         thumbnaildata = None
 
                     try:
-                        if msgs["quoted_row_id"] == "" or msgs["quoted_row_id"] is None:
+                        if  msgs["quoted_row_id"] is None or msgs["quoted_row_id"] == "" or msgs["quoted_row_id"] == 0:
                             parent_msg = 0
                         else:
                             parent_msg = msgs["quoted_row_id"]
+
                     except:
                         parent_msg = 0
 
@@ -682,6 +694,7 @@ class XporterAndroid(Xporter):
                                            parentmsg=None,
                                            mode=self.mode)
                 if not curr_message.status==6:
+                    #status=6 is empty message like NEWGROUP or may be other status msgs with no chat
                     curr_message.process_content_type()
                     msg_list.append(curr_message)
                 #end:for loop
@@ -697,8 +710,40 @@ class XporterAndroid(Xporter):
             sys.exit(1)
 
         self.msgs_dict[chat_id]=msg_list
+        self.get_parent_msgs_for_chat(chat_id)
         return msg_list
         #end:get_all_msgs
+
+    def get_parent_msgs_for_chat(self,chat_id):
+
+        if len(self.msgs_dict[chat_id])<=0:
+            return
+
+
+        pids=[]
+        newpids=[]
+        msgs_with_parent={}
+        for idx,msg in enumerate(self.msgs_dict[chat_id]):
+            if msg.parent_msg!=0:
+                pids.append(msg.parent_msg)
+                msgs_with_parent[msg.parent_msg]=0
+        if len(pids)<=0:
+            return
+
+        sqlc="select msgs._id , quote._id as qid from messages as msgs INNER JOIN messages_quotes as quote ON msgs.key_id=quote.key_id where quote._id IN ({seq})".format(
+            seq=','.join(['?']*len(pids))
+            )
+        pcur=self.msgstore.cursor()
+        pcur.execute(sqlc,pids)
+
+        for p in pcur:
+            if msgs_with_parent[p['qid']] is not None:
+                msgs_with_parent[p['qid']]=p['_id']
+
+        for idx,msg in enumerate(self.msgs_dict[chat_id]):
+            if msg.parent_msg!=0:
+                if msgs_with_parent[msg.parent_msg] is not None:
+                    self.msgs_dict[chat_id][idx].parent_msg=msgs_with_parent[msg.parent_msg]
 
 
 #endClass: XporterAndroid
