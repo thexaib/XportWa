@@ -145,10 +145,14 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None,isolate=False):
     cur_day=msgs[0].msg_date.split(" ")[0]
     outfile.write('<p class="day-link">Goto Date</p>')
     outfile.write('<a class="day-link" href="#{}">{}</a>'.format(cur_day,cur_day))
+
+    list_of_days=[]
+    list_of_days.append(cur_day)
     for idx,msg in enumerate(msgs):
         this_day=msg.msg_date.split(" ")[0]
         if this_day!=cur_day:
             cur_day=this_day
+            list_of_days.append(cur_day)
             outfile.write('<a class="day-link" href="#{}">{}</a>'.format(cur_day,cur_day))
 
     outfile.write('</div>')
@@ -163,7 +167,14 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None,isolate=False):
         this_day=msg.msg_date.split(" ")[0]
         if this_day!=cur_day:
             cur_day=this_day
-            outfile.write('<div class="day-marker" id="{}">{}</div>'.format(cur_day,cur_day))
+            outfile.write('<div class="day-marker" id="{}">'.format(cur_day))
+            if list_of_days[list_of_days.index(cur_day)-1] is not None:
+                outfile.write('<a href="#{}" class="day-up-link">&#x2B06;</a>'.format(list_of_days[list_of_days.index(cur_day)-1]))
+            outfile.write('{}'.format(cur_day))
+            if list_of_days.index(cur_day)<len(list_of_days)-1:
+                if list_of_days[list_of_days.index(cur_day)+1] is not None:
+                    outfile.write('<a href="#{}"class="day-down-link">&#x2B07;</a>'.format(list_of_days[list_of_days.index(cur_day)+1]))
+            outfile.write('</div>')
 
         if msg.from_me:
             frm="ME"
@@ -450,6 +461,9 @@ def find_msgindex_by_id(parent_id,msgs):
         return None
 
 def get_isolated_linkfile(src,dest,msg):
+
+    if src is None or not os.path.isfile(src):
+        return '#'
     dt = datetime.datetime.strptime(msg.msg_date, '%Y-%m-%d %I:%M:%S%p')
     thedate=dt.strftime('%Y%m%d-%H%M-%S')
     fname=''
@@ -458,10 +472,15 @@ def get_isolated_linkfile(src,dest,msg):
     #    srcpath=src.split(os.path.sep)
     #    fname=thedate+'_'+srcpath[-1].split('-')[-1]
 
+    fname=thedate
     #adding filesize to the name, if same filename exists
-    statinfo = os.stat(src)
-    fsize = statinfo.st_size
-    fname=thedate+"$"+str(fsize)
+    try:
+        statinfo = os.stat(src)
+        fsize = statinfo.st_size
+        fname=fname+"$"+str(fsize)
+    except:
+        fname=fname+'$00'
+
     #adding type to fname
     if msg.msg_type==Message.CONTENT_IMAGE:
         fname='IMG-'+fname
