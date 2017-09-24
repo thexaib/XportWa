@@ -48,7 +48,7 @@ parser.add_argument('-o', '--outfile',  dest='outfile',
 parser.add_argument('-d', '--id', dest='chat_id',
                     help="Comma separated list of chat ids ",default="")
 
-
+parser.add_argument('-s','--isolate',action='store_true',dest='isolate',help='separate or isolate chat media into its own folder by copying media files',default=False)
 options = parser.parse_args()
 
 
@@ -115,7 +115,7 @@ if len(list_ids)>0:
                 outfilename=options.outfile+".html"
             else:
                 outfilename=options.outfile+"_"+id+".html"
-        report_html(chats[int(id)],msgs,infolder=infolder,outfile=outfilename)
+        report_html(chats[int(id)],msgs,infolder=infolder,outfile=outfilename,isolate=options.isolate)
 
 else:
     print_chats(chats)

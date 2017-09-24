@@ -4,6 +4,7 @@ from model import Message
 import sys, re, os, string, datetime, time, sqlite3, glob, webbrowser, base64, subprocess
 import fnmatch
 import replace_smileys_p3
+import shutil
 
 ######################################
 #get_all_media_files
@@ -85,7 +86,7 @@ def replace_smileys (text):
 #end:replace_smileys
 
 
-def report_html(cs=None,msgs=None,infolder=None,outfile=None):
+def report_html(cs=None,msgs=None,infolder=None,outfile=None,isolate=False):
     global _allfiles_sizes,_allfiles_names
     if len(_allfiles_names)==0:
         if cs.mode=='Android':
@@ -108,18 +109,25 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None):
     lastdate=lastdate.replace(':','')
     lastdate=lastdate[:-2]
 
-    fname=lastdate+"_"+cs.contact_name+".html"
+    fname=""
+    foldername=""
     if outfile is not None:
         fname=outfile
+        foldername='xwamedia'+os.sep+fname.replace('.html','')
     else:
         fname=lastdate+"_"+cs.contact_name+".html"
+        foldername='xwamedia'+os.sep+lastdate+"_"+cs.contact_name
+
+    if isolate:
+        if not os.path.exists(foldername):
+            os.makedirs(foldername)
 
     outfile=open(fname,"w")
     outfile.write('<!DOCTYPE html><html lang="en">')
     outfile.write('<head>')
-    outfile.write('<meta charset="utf-8"><link rel="stylesheet" href="out.css">')
-    outfile.write("""<link rel="stylesheet" href="data/lightbox/lightbox_styles.css" type="text/css">
-                  <script type="text/javascript" src="data/lightbox/lightbox.js"></script>""")
+    outfile.write('<meta charset="utf-8"><link rel="stylesheet" href="_style/xportwacss.css">')
+    outfile.write("""<link rel="stylesheet" href="_style/lightbox_styles.css" type="text/css">
+                  <script type="text/javascript" src="_style/lightbox.js"></script>""")
     outfile.write('</head>')
     outfile.write('<body>')
     #printing chat title
@@ -166,14 +174,18 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None):
         #temp filtering by msg type
         #if  msg.msg_type!=0:
         #if  msg.parent_msg!=0:
-        outfile.write(get_html_for_msg(frm,msg,msgs_list=msgs,infolder=infolder))
+        outfile.write(get_html_for_msg(frm,msg,
+                                       msgs_list=msgs,
+                                       infolder=infolder,
+                                       isolation=isolate,
+                                       isofolder=foldername,))
 
     outfile.write('</div">')
     outfile.write('</body></html>')
     outfile.close()
 
 
-def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
+def get_html_for_msg(frm,msg,msgs_list=None,infolder="",isolation=False,isofolder=None):
 
     content=""
     date = str(msg.msg_date)[:10]
@@ -189,6 +201,8 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
         #msg.media_url, msg.media_thumb,
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
         content+='<img src="{_src}" alt="Image" class="attachment lightbox-photo"/><!-- {_thumb} -->'.format( _src=linkfile,
                                  _thumb=msg.media_thumb).encode('utf-8')
 
@@ -198,6 +212,8 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
         content+='<audio controls><source src="{}" type="audio/ogg">Your browser does not support the audio element.</audio>'.format(linkfile).encode('utf-8')
 
     elif msg.msg_type==Message.CONTENT_VIDEO:
@@ -207,6 +223,8 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
         content+='<video class="vid-attachment" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'.format(linkfile).encode('utf-8')
 
     elif msg.msg_type==Message.CONTENT_GIF_VIDEO:
@@ -217,6 +235,9 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
+
         content+='<video class="vid-attachment" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'.format(linkfile).encode('utf-8')
 
     elif msg.msg_type==Message.CONTENT_MEDIA_THUMB:
@@ -240,6 +261,9 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
                 tag='<audio controls><source src="{}" type="audio/ogg">Your browser does not support the audio element.</audio>'
             elif linkfile.endswith(('.mp4','.mov')):
                 tag='<video class="vid-attachment" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'
+
+            if isolation:
+                linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
 
         content+=tag.format(linkfile).encode('utf-8')
 
@@ -286,7 +310,7 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
     quotehtml=''
     if msg.parent_msg!=0:
         quoted_msg=msgs_list[find_msgindex_by_id(parent_id=msg.parent_msg,msgs=msgs_list)]
-        qcontent=get_preview_msg(quoted_msg,infolder=infolder)
+        qcontent=get_preview_msg(quoted_msg,infolder=infolder,isolation=isolation,isofolder=isofolder)
         quotehtml='<div class="quote"><a href="#{div_id}">{content}</a></div>'.format(
             div_id=msg.parent_msg,
             content=qcontent
@@ -311,7 +335,7 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder=""):
 
     #end:get_html_for_msg
 
-def get_preview_msg(msg,infolder):
+def get_preview_msg(msg,infolder,isolation=False,isofolder=''):
     prevhtml=""
     date = str(msg.msg_date)[:10]
     if date != 'N/A' and date != 'N/A error':
@@ -327,6 +351,8 @@ def get_preview_msg(msg,infolder):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
         prevhtml+='<img src="{}" alt="Image" class="preview"/><!-- {} -->'.format( linkfile,msg.media_thumb).encode('utf-8')
 
     elif msg.msg_type == Message.CONTENT_AUDIO:
@@ -337,6 +363,9 @@ def get_preview_msg(msg,infolder):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
+
         prevhtml+='<video controls class="preview"><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'.format(linkfile).encode('utf-8')
 
     elif msg.msg_type==Message.CONTENT_GIF_VIDEO:
@@ -344,6 +373,9 @@ def get_preview_msg(msg,infolder):
         if msg.local_url !="":
             patern='*'+msg.local_url+'*'
         linkfile = get_file_from_medialist (size=msg.media_size,filenamepatern=patern,mode=msg.mode,infolder=infolder)
+        if isolation:
+            linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
+
         prevhtml+='<video class="preview" ><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'.format(linkfile).encode('utf-8')
 
     elif msg.msg_type==Message.CONTENT_MEDIA_THUMB:
@@ -364,6 +396,9 @@ def get_preview_msg(msg,infolder):
                 tag='<audio controls><source src="{}" type="audio/ogg">Your browser does not support the audio element.</audio>'
             elif linkfile.endswith(('.mp4','.mov')):
                 tag='<video class="vid-attachment" controls><source src="{}" type="video/mp4">Your browser does not support the video tag.</video>'
+
+            if isolation:
+                linkfile=get_isolated_linkfile(src=linkfile,dest=isofolder,msg=msg)
 
         prevhtml+=tag.format(linkfile).encode('utf-8')
 
@@ -413,3 +448,51 @@ def find_msgindex_by_id(parent_id,msgs):
             break
     else:
         return None
+
+def get_isolated_linkfile(src,dest,msg):
+    dt = datetime.datetime.strptime(msg.msg_date, '%Y-%m-%d %I:%M:%S%p')
+    thedate=dt.strftime('%Y%m%d-%H%M-%S')
+    fname=''
+    #adding nums in case two files at same time exists,which is highly unlikely
+    #if msg.mode=='Android':
+    #    srcpath=src.split(os.path.sep)
+    #    fname=thedate+'_'+srcpath[-1].split('-')[-1]
+
+    #adding filesize to the name, if same filename exists
+    statinfo = os.stat(src)
+    fsize = statinfo.st_size
+    fname=thedate+"$"+str(fsize)
+    #adding type to fname
+    if msg.msg_type==Message.CONTENT_IMAGE:
+        fname='IMG-'+fname
+    elif msg.msg_type==Message.CONTENT_GIF_VIDEO:
+        fname='GIF-'+fname
+    elif msg.msg_type==Message.CONTENT_VIDEO:
+        fname='VID-'+fname
+    elif msg.msg_type==Message.CONTENT_AUDIO:
+        fname='AUD-'+fname
+    else:
+        if src.endswith(('.jpg','.jpeg','.tiff','.png')):
+            fname='IMG-'+fname
+        elif src.endswith(('.mp3','.aac','.opus')):
+            fname='AUD-'+fname
+        elif src.endswith(('.mp4','.mov')):
+            fname='VID-'+fname
+        else:
+            fname="MED-"+fname
+
+
+    extension=os.path.splitext(src)[1]
+
+    newlinkfile=dest+os.sep+fname+extension
+    if os.path.exists(newlinkfile):
+        return newlinkfile
+
+    try:
+        shutil.copy2(src,newlinkfile)
+    except Exception as ex:
+        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+        message = template.format(type(ex).__name__, ex.args)
+        print message
+    return newlinkfile
+

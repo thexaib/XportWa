@@ -7,6 +7,7 @@ norepo/*
 *.iml
 .idea/*
 *.html
+xwamedia/*
 
 # C extensions
 *.so

@@ -121,13 +121,13 @@ class Message:
                     msgdate = str(msgdate)
                     if msgdate.find(".") > -1: #if timestamp is not like "304966548", but like "306350664.792749", then just use the numbers in front of the "."
                         msgdate = msgdate[:msgdate.find(".")]
-                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)+11323*60*1440).strftime("%Y-%m-%d %I:%M%p")
+                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)+11323*60*1440).strftime("%Y-%m-%d %I:%M:%S%p")
                 elif mode == "Android":
                     msgdate = str(msgdate)
                     # cut last 3 digits (microseconds)
                     msgdate = msgdate[:-3]
                     #self.msg_date = datetime.datetime.fromtimestamp(int(msgdate))
-                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)).strftime("%Y-%m-%d %I:%M%p")
+                    self.msg_date = datetime.datetime.fromtimestamp(int(msgdate)).strftime("%Y-%m-%d %I:%M:%S%p")
             except (TypeError, ValueError) as msg:
                 print('Error while reading message #{}: {}'.format(self.id, msg))
                 self.msg_date = "N/A error"
