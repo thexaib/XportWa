@@ -138,7 +138,10 @@ p.day-link
     float: right;
     color: #6fc3dd;
 }
-
+.bigger
+{
+    font-size:2em;
+}
 .content_date
 {
     font-size: 0.8em;

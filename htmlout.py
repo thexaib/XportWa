@@ -313,8 +313,11 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder="",isolation=False,isofolde
         msgtext = re.sub(r'((?<!\S)www\.[^\s\n\r]+)', r'<a onclick="image(this.href);return(false);" target="image" href="http://\1">\1</a>', msgtext)
         msgtext = msgtext.replace ("\n", "<br>\n")
         try:
-            #content+='<p>{}</p>'.format(msgtext).encode('utf-8')
-            content+='<p>{}</p>'.format(msgtext)
+            if len(msg.msg_text)>0 and len(msg.msg_text)<5 :
+                #content+='<p>{}</p>'.format(msgtext).encode('utf-8')
+                content+='<p class="bigger">{}</p>'.format(msgtext)
+            else:
+                content+='<p>{}</p>'.format(msgtext)
         except:
             content+='<p>N/A</p>'.encode('utf-8')
 
