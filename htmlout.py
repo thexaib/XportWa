@@ -115,7 +115,7 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None,isolate=False):
         fname=outfile
         foldername='xwamedia'+os.sep+fname.replace('.html','')
     else:
-        fname=lastdate+"_"+cs.contact_name+".html"
+        fname=firstdate+"_to_"+lastdate+"_"+cs.contact_name+".html"
         foldername='xwamedia'+os.sep+lastdate+"_"+cs.contact_name
 
     if isolate:
