@@ -121,7 +121,7 @@ def report_html(cs=None,msgs=None,infolder=None,outfile=None,isolate=False):
         foldername='xwamedia'+os.sep+fname.replace('.html','')
     else:
         fname=firstdate+"_to_"+lastdate+"_"+cs.contact_name+".html"
-        foldername='xwamedia'+os.sep+lastdate+"_"+cs.contact_name
+        foldername='xwamedia'+os.sep+firstdate+"_"+cs.contact_name
 
     if isolate:
         if not os.path.exists(foldername):
