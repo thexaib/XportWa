@@ -322,8 +322,16 @@ def get_html_for_msg(frm,msg,msgs_list=None,infolder="",isolation=False,isofolde
             content+='<p>N/A</p>'.encode('utf-8')
 
     quotehtml=''
-    if msg.parent_msg!=0:
-        quoted_msg=msgs_list[find_msgindex_by_id(parent_id=msg.parent_msg,msgs=msgs_list)]
+    if msg.parent_msg!=0 and msg.parent_msg is not None and isinstance(msg.parent_msg,int):
+        if msg.id==46278:
+            print 'ok'
+        try:
+            quoted_msg=msgs_list[find_msgindex_by_id(parent_id=msg.parent_msg,msgs=msgs_list)]
+        except:
+            quoted_msg=Message(text="REFERENCE NOT FOUND")
+            quoted_msg.msg_txt="ERROR!!"
+            quoted_msg.msg_type=Message.CONTENT_TEXT
+
         qcontent=get_preview_msg(quoted_msg,infolder=infolder,isolation=isolation,isofolder=isofolder)
         quotehtml='<div class="quote"><a href="#{div_id}">{content}</a></div>'.format(
             div_id=msg.parent_msg,
